@@ -42,16 +42,15 @@ def process_images(input_dir, output_dir, batch_size=32):
         batch_files = files[i * batch_size: (i + 1) * batch_size]
 
         for file in batch_files:
-            # 출력 디렉토리 경로가 없다면 생성
             os.makedirs(os.path.dirname(file.replace(input_dir, output_dir)), exist_ok=True)
 
-        # 이미지 전처리
+        # preprocess image
         image_tensors = preprocess_image(batch_files)
 
-        # 이미지 인코딩
+        # encode image
         latents = encode_image(image_tensors)
 
-        # 인코딩된 latents 저장
+        # save encoded latents
         for file, latent in zip(batch_files, latents):
             np.save(file.replace(os.path.splitext(file)[1], '.npy').replace(input_dir, output_dir),
                     latent.cpu().numpy())
