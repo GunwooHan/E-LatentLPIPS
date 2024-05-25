@@ -13,13 +13,15 @@ from .pretrained_networks import LatentVGG16, VGG16
 class LPIPSModule(pl.LightningModule):
     def __init__(self, args: Any = None) -> None:
         super(LPIPSModule, self).__init__()
+        self.args = args
+
         self.model = LPIPS(
-            pretrained=True if args.pretrained else False,
+            pretrained=True,
             spatial=False,
             pnet_rand=getattr(args, 'pnet_rand', False),
             pnet_tune=getattr(args, 'pnet_tune', False),
             use_dropout=True,
-            latent_mode=True if args.latent_mode else False
+            latent_mode=getattr(args, 'latent_mode', False)
         )
 
         self.rank_loss = BCERankingLoss()
@@ -59,7 +61,7 @@ class LPIPSModule(pl.LightningModule):
         self.log("test/score", scores.mean() * 100, on_epoch=True, prog_bar=True)
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=self.learning_rate, betas=(0.9, 0.999))
+        optimizer = optim.Adam(self.parameters(), lr=self.args.learning_rate, betas=(0.9, 0.999))
         return optimizer
 
     def load_checkpoint(self, model_path):
