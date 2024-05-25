@@ -11,14 +11,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--batch_size', type=int, default=50)
-    parser.add_argument('--num_workers', type=int, default=31)
+    parser.add_argument('--num_workers', type=int, default=16)
 
     parser.add_argument('--model', type=str, default='vgg')
-    parser.add_argument('--model_path', type=str, default='checkpoints/1_vgg.pth')
+    parser.add_argument('--model_path', type=str, default='checkpoints/vggepoch=08-val/score=81.17.ckpt')
 
     parser.add_argument('--data_dir', type=str, default='dataset')
     parser.add_argument('--dataset_mode', type=str, default='2afc')
-    parser.add_argument('--val_dataset_dir', type=str, nargs='+', default=['val/traditional'])
+    parser.add_argument('--val_dataset_dir', type=str, nargs='+', default=['val/cnn'])
     parser.add_argument('--latent_mode', type=bool, default=False)
     args = parser.parse_args()
 
@@ -26,8 +26,13 @@ if __name__ == '__main__':
 
     pl.seed_everything(args.seed)
 
-    model = e_latent_lpips.LPIPSModule()
-    model.load_checkpoint(args.model_path)
+    if os.path.splitext(args.model_path)[1] in ['.pt', '.pth']:
+        model = e_latent_lpips.LPIPSModule()
+        model.load_checkpoint(args.model_path)
+    elif os.path.splitext(args.model_path)[1] == '.ckpt':
+        model = e_latent_lpips.LPIPSModule.load_from_checkpoint(args.model_path)
+    else:
+        model = e_latent_lpips.LPIPSModule()
 
     dm = BAPPSDataModule(
         data_dir=args.data_dir,
