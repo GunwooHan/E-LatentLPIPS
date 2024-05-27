@@ -75,6 +75,7 @@ if __name__ == '__main__':
     )
 
     trainer = pl.Trainer(
+        devices=1,
         max_epochs=args.epochs,
         callbacks=[checkpoint_callback],
         logger=wandb_logger if args.wandb else None
