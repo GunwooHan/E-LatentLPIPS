@@ -25,11 +25,11 @@ if __name__ == '__main__':
     # parser.add_argument('--horizontal_flip', type=float, default=0.2)
     # parser.add_argument('--rotate_90_degrees', type=float, default=0.2)
     # parser.add_argument('--VerticalFlip', type=float, default=0.2)
-    
-    parser.add_argument('--blit', type=bool, default=True)
-    parser.add_argument('--geometric', type=bool, default=True)
-    parser.add_argument('--color', type=bool, default=True)
-    parser.add_argument('--cutout', type=bool, default=True)
+
+    parser.add_argument('--blit', type=bool, default=False)
+    parser.add_argument('--geometric', type=bool, default=False)
+    parser.add_argument('--color', type=bool, default=False)
+    parser.add_argument('--cutout', type=bool, default=False)
 
     parser.add_argument('--model', type=str, default='vgg')
     parser.add_argument('--checkpoints_dir', type=str, default='checkpoints')
