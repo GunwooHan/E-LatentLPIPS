@@ -1,11 +1,13 @@
 import glob
 import os
+import argparse
+
 import torch
+import torch.nn.functional as F
+from torchvision import transforms
 import numpy as np
 from PIL import Image
-from torchvision import transforms
 from diffusers import AutoencoderKL
-import argparse
 import tqdm
 
 vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-ema")
@@ -58,8 +60,8 @@ def process_images(input_dir, output_dir, batch_size=32):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_dir', type=str, default='dataset/2afc')
-    parser.add_argument('--output_dir', type=str, default='dataset/latent_2afc')
+    parser.add_argument('--input_dir', type=str, default='dataset/2afc/val/traditional')
+    parser.add_argument('--output_dir', type=str, default='dataset/latent_2afc/val/traditional')
     parser.add_argument('--batch_size', type=int, default=64)
     args = parser.parse_args()
 

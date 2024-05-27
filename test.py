@@ -14,25 +14,26 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int, default=16)
 
     parser.add_argument('--model', type=str, default='vgg')
-    parser.add_argument('--model_path', type=str, default='checkpoints/vggepoch=08-val/score=81.17.ckpt')
+    parser.add_argument('--model_path', type=str, default='checkpoints/latent/vgg-epoch=08-val/score=75.62.ckpt')
+    # parser.add_argument('--model_path', type=str, default='')
 
     parser.add_argument('--data_dir', type=str, default='dataset')
-    parser.add_argument('--dataset_mode', type=str, default='2afc')
-    parser.add_argument('--val_dataset_dir', type=str, nargs='+', default=['val/cnn'])
+    parser.add_argument('--dataset_mode', type=str, default='latent_2afc')
+    parser.add_argument('--val_dataset_dir', type=str, nargs='+', default=['val/traditional'])
     parser.add_argument('--latent_mode', type=bool, default=False)
     args = parser.parse_args()
 
-    wandb_logger = WandbLogger(project='E-LatentLPIPS')
+    wandb_logger = WandbLogger(project='E-LatentLPIPS', tags=args.val_dataset_dir)
 
     pl.seed_everything(args.seed)
 
     if os.path.splitext(args.model_path)[1] in ['.pt', '.pth']:
-        model = e_latent_lpips.LPIPSModule()
+        model = e_latent_lpips.LPIPSModule(args)
         model.load_checkpoint(args.model_path)
     elif os.path.splitext(args.model_path)[1] == '.ckpt':
-        model = e_latent_lpips.LPIPSModule.load_from_checkpoint(args.model_path)
+        model = e_latent_lpips.LPIPSModule.load_from_checkpoint(args.model_path, args=args)
     else:
-        model = e_latent_lpips.LPIPSModule()
+        model = e_latent_lpips.LPIPSModule(args)
 
     dm = BAPPSDataModule(
         data_dir=args.data_dir,

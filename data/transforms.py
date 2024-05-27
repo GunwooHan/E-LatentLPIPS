@@ -8,11 +8,10 @@ def create_transforms(args=None):
     if not args.latent_mode:
         transform.append(A.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)))
 
-    transform.append(A.Resize(64, 64))
-
     if not args.latent_mode:
-        transform.append(ToTensorV2())
+        transform.append(A.Resize(64, 64))
 
+    transform.append(ToTensorV2())
 
     return A.Compose(transform,
                      additional_targets={
