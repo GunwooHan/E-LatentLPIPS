@@ -3,7 +3,7 @@ from typing import List
 import pytorch_lightning as pl
 from torch.utils.data import DataLoader
 
-from data.transforms import create_transforms
+from data.transforms import create_train_transforms, create_valid_transforms
 from .latent_twoafc import LatentTwoAFCDataset
 from .twoafc import TwoAFCDataset
 
@@ -29,7 +29,8 @@ class BAPPSDataModule(pl.LightningDataModule):
         self.val_dataset_dir = val_dataset_dir
 
         self.data_dir = data_dir
-        self.transform = create_transforms(self.args)
+        self.train_transform = create_train_transforms(self.args)
+        self.valid_transform = create_valid_transforms(self.args)
 
     def prepare_data(self):
         # download
@@ -38,13 +39,13 @@ class BAPPSDataModule(pl.LightningDataModule):
     def setup(self, stage: str):
         if stage == "fit":
             if self.dataset_mode == '2afc':
-                self.bapps_train = TwoAFCDataset(self.data_dir, self.train_dataset_dir, self.transform)
-                self.bapps_val = TwoAFCDataset(self.data_dir, self.val_dataset_dir, self.transform)
+                self.bapps_train = TwoAFCDataset(self.data_dir, self.train_dataset_dir, self.train_transform)
+                self.bapps_val = TwoAFCDataset(self.data_dir, self.val_dataset_dir, self.valid_transform)
             elif self.dataset_mode == 'jnd':
                 raise f'{self.dataset_mode} Not implemented yet'
             elif self.dataset_mode == 'latent_2afc':
-                self.bapps_train = LatentTwoAFCDataset(self.data_dir, self.train_dataset_dir, self.transform)
-                self.bapps_val = LatentTwoAFCDataset(self.data_dir, self.val_dataset_dir, self.transform)
+                self.bapps_train = LatentTwoAFCDataset(self.data_dir, self.train_dataset_dir, self.train_transform)
+                self.bapps_val = LatentTwoAFCDataset(self.data_dir, self.val_dataset_dir, self.valid_transform)
             elif self.dataset_mode == 'latent_jnd':
                 raise f'{self.dataset_mode} Not implemented yet'
             else:
@@ -57,11 +58,11 @@ class BAPPSDataModule(pl.LightningDataModule):
 
         elif stage == "test":
             if self.dataset_mode == '2afc':
-                self.bapps_test = TwoAFCDataset(self.data_dir, self.val_dataset_dir, self.transform)
+                self.bapps_test = TwoAFCDataset(self.data_dir, self.val_dataset_dir, self.valid_transform)
             elif self.dataset_mode == 'jnd':
                 raise f'{self.dataset_mode} Not implemented yet'
             elif self.dataset_mode == 'latent_2afc':
-                self.bapps_test = LatentTwoAFCDataset(self.data_dir, self.val_dataset_dir, self.transform)
+                self.bapps_test = LatentTwoAFCDataset(self.data_dir, self.val_dataset_dir, self.valid_transform)
             elif self.dataset_mode == 'latent_jnd':
                 raise f'{self.dataset_mode} Not implemented yet'
             else:

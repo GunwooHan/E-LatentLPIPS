@@ -2,7 +2,7 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
 
-def create_transforms(args=None):
+def create_train_transforms(args=None):
     transform = []
 
     if not args.latent_mode:
@@ -43,6 +43,24 @@ def create_transforms(args=None):
     if args.color:
         transform.append(A.RandomBrightnessContrast(p=0.2))
         transform.append(A.HueSaturationValue(p=0.2))
+
+    transform.append(ToTensorV2())
+
+    return A.Compose(transform,
+                     additional_targets={
+                         'image0': 'image',
+                         'image1': 'image',
+                     })
+
+
+def create_valid_transforms(args=None):
+    transform = []
+
+    if not args.latent_mode:
+        transform.append(A.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)))
+
+    if not args.latent_mode:
+        transform.append(A.Resize(64, 64))
 
     transform.append(ToTensorV2())
 
