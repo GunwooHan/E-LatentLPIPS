@@ -14,6 +14,7 @@ class LPIPSModule(pl.LightningModule):
     def __init__(self, args: Any = None) -> None:
         super(LPIPSModule, self).__init__()
         self.args = args
+        self.save_hyperparameters(args)
 
         self.model = LPIPS(
             pretrained=True,
@@ -65,7 +66,7 @@ class LPIPSModule(pl.LightningModule):
         return optimizer
 
     def load_checkpoint(self, model_path):
-        self.model.load_state_dict(torch.load(model_path, map_location='cpu'), strict=False)
+        self.load_state_dict(torch.load(model_path, map_location='cpu'), strict=False)
 
 
 def spatial_average(in_tens, keepdim=True):
@@ -89,6 +90,7 @@ class LPIPS(nn.Module):
         super(LPIPS, self).__init__()
 
         self.spatial = spatial
+        self.latent_mode = latent_mode
         self.scaling_layer = ScalingLayer()
 
         self.channels = [64, 128, 256, 512, 512]
@@ -110,7 +112,10 @@ class LPIPS(nn.Module):
             in0 = 2 * in0 - 1
             in1 = 2 * in1 - 1
 
-        in0_input, in1_input = (self.scaling_layer(in0), self.scaling_layer(in1))
+        if not self.latent_mode:
+            in0_input, in1_input = (self.scaling_layer(in0), self.scaling_layer(in1))
+        else:
+            in0_input, in1_input = in0, in1
 
         outs0, outs1 = self.net.forward(in0_input), self.net.forward(in1_input)
         feats0, feats1, diffs = {}, {}, {}
