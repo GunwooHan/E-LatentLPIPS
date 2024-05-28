@@ -75,7 +75,7 @@ if __name__ == '__main__':
             tag.append('Latent')
 
         tag += args.train_dataset_dir
-        tag += args.val_data_dir
+        tag += args.val_dataset_dir
 
         wandb_logger = WandbLogger(project='E-LatentLPIPS', tags=[])
 
