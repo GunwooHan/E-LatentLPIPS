@@ -60,7 +60,24 @@ if __name__ == '__main__':
     )
 
     if args.wandb:
-        wandb_logger = WandbLogger(project='E-LatentLPIPS')
+        tag = []
+
+        if args.blit:
+            tag.append('blit')
+        if args.geometric:
+            tag.append('geometric')
+        if args.cutout:
+            tag.append('cutout')
+        if args.color:
+            tag.append('color')
+
+        if args.latent_mode:
+            tag.append('Latent')
+
+        tag += args.train_dataset_dir
+        tag += args.val_data_dir
+
+        wandb_logger = WandbLogger(project='E-LatentLPIPS', tags=[])
 
     model = e_latent_lpips.LPIPSModule(args)
 
