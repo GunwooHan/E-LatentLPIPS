@@ -33,10 +33,10 @@ class LPIPSModule(pl.LightningModule):
         d1s = self.model(ref_img, p1_img)
         gts = judge_img
         scores = (d0s < d1s) * (1. - gts) + (d1s < d0s) * gts + (d1s == d0s) * .5
-        self.log("train/score", scores.mean() * 100, on_epoch=True, prog_bar=True)
+        self.log("train/score", scores.mean() * 100, on_epoch=True, prog_bar=True, sync_dist=True)
 
         total_loss = self.rank_loss(d0s, d1s, gts)
-        self.log("train/total_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/total_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return total_loss
 
@@ -46,10 +46,10 @@ class LPIPSModule(pl.LightningModule):
         d1s = self.model(ref_img, p1_img)
         gts = judge_img
         scores = (d0s < d1s) * (1. - gts) + (d1s < d0s) * gts + (d1s == d0s) * .5
-        self.log("val/score", scores.mean() * 100, on_epoch=True, prog_bar=True)
+        self.log("val/score", scores.mean() * 100, on_epoch=True, prog_bar=True, sync_dist=True)
 
         total_loss = self.rank_loss(d0s, d1s, gts)
-        self.log("val/total_loss", total_loss, on_epoch=True, prog_bar=True)
+        self.log("val/total_loss", total_loss, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return total_loss
 
@@ -67,6 +67,13 @@ class LPIPSModule(pl.LightningModule):
 
     def load_checkpoint(self, model_path):
         self.load_state_dict(torch.load(model_path, map_location='cpu'), strict=False)
+
+    def forward(self, x0, x1, normalize=False):
+        x0 = (x0 - x0.min()) / (x0.max() - x0.min())
+        x1 = (x1 - x1.min()) / (x1.max() - x1.min())
+        x0 = x0 * 2 - 1
+        x1 = x1 * 2 - 1
+        return self.model(x0, x1)
 
 
 def spatial_average(in_tens, keepdim=True):
