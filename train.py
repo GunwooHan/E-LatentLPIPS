@@ -77,7 +77,7 @@ if __name__ == '__main__':
         tag += args.train_dataset_dir
         tag += args.val_dataset_dir
 
-        wandb_logger = WandbLogger(project='E-LatentLPIPS', tags=[])
+        wandb_logger = WandbLogger(project='E-LatentLPIPS', tags=tag)
 
     model = e_latent_lpips.LPIPSModule(args)
 
