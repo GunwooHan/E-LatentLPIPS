@@ -100,7 +100,8 @@ class SingleReconstruction(pl.LightningModule):
                     log_sample_image = self.vae.decode(y_hat).sample
                     self.logger.log_image("reconstruction", [log_sample_image], step=self.global_step + 1)
             else:
-                pass
+                self.logger.log_image("reconstruction", [y_hat], step=self.global_step + 1)
+
         return lpips_loss
 
     def forward(self, x):
