@@ -83,7 +83,7 @@ class SingleReconstruction(pl.LightningModule):
         # self.log("lpips_torch_loss", lpips_torch_loss, on_step=True, prog_bar=True)
         self.log("psnr_loss", psnr_loss, on_step=True, prog_bar=True)
 
-        if self.global_step % 5000 == 0:
+        if self.global_step % 500 == 0:
             if args.latent_mode:
                 with torch.no_grad():
                     log_sample_image = self.vae.decode(y_hat).sample
