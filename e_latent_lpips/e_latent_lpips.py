@@ -61,7 +61,7 @@ class LPIPSModule(pl.LightningModule):
         scores = (d0s < d1s) * (1. - gts) + (d1s < d0s) * gts + (d1s == d0s) * .5
         self.log("test/score", scores.mean() * 100, on_epoch=True, prog_bar=True)
 
-    def on_train_epoch_end(self):
+    def on_train_batch_end(self, *args: Any):
         for module in self.model.lins.modules():
             if (hasattr(module, 'weight') and module.kernel_size == (1, 1)):
                 module.weight.data = torch.clamp(module.weight.data, min=0)
