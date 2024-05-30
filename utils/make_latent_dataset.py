@@ -7,10 +7,12 @@ import torch.nn.functional as F
 from torchvision import transforms
 import numpy as np
 from PIL import Image
-from diffusers import AutoencoderKL
+from diffusers import AutoencoderKL, StableDiffusionPipeline
 import tqdm
 
-vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-ema")
+# vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-ema")\
+pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+vae = pipe.vae
 vae.eval()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 vae = vae.to(device)
