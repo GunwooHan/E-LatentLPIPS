@@ -64,6 +64,9 @@ class SingleReconstruction(pl.LightningModule):
             param.requires_grad = False
         for name, param in self.vae.named_parameters():
             param.requires_grad = False
+        for name, param in self.lpips.named_parameters():
+            param.requires_grad = False
+
 
     def training_step(self, batch, batch_idx):
         x, y = batch
