@@ -73,13 +73,11 @@ class SingleReconstruction(pl.LightningModule):
 
         lpips_loss = self.lpips(y, y_hat).flatten()
         psnr_loss = self.psnr(y, y_hat)
-        recon_loss = F.mse_loss(y, y_hat)
         # y = (y - y.min()) / (y.max() - y.min()) * 2 - 1
         # y_hat = (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) * 2 - 1
         # lpips_torch_loss = self.lpips_torch(y, y_hat)
 
         self.log("lpips_loss", lpips_loss, on_step=True, prog_bar=True)
-        self.log("recon_loss", recon_loss, on_step=True, prog_bar=True)
         # self.log("lpips_torch_loss", lpips_torch_loss, on_step=True, prog_bar=True)
         self.log("psnr_loss", psnr_loss, on_step=True, prog_bar=True)
 
@@ -90,7 +88,7 @@ class SingleReconstruction(pl.LightningModule):
                     self.logger.log_image("reconstruction", [log_sample_image], step=self.global_step + 1)
             else:
                 pass
-        return lpips_loss + recon_loss
+        return lpips_loss
 
     def forward(self, x):
         pass
