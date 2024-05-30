@@ -72,7 +72,6 @@ class SingleReconstruction(pl.LightningModule):
         y_hat = self.model(x, args.seed, self.encode_hidden_state).sample
 
         lpips_loss = self.lpips(y, y_hat).flatten()
-        lpips_loss = self.lpips(y, y_hat).flatten()
         psnr_loss = self.psnr(y, y_hat)
         recon_loss = F.mse_loss(y, y_hat)
         # y = (y - y.min()) / (y.max() - y.min()) * 2 - 1
@@ -122,7 +121,7 @@ class SingleReconstructionDataModule(pl.LightningModule):
         target_image = self.transform(image)
         if latent_mode:
             with torch.no_grad():
-                target_image = self.vae.encode(target_image.unsqueeze(0)).latent_dist.sample() * 0.18215  # Encode image
+                target_image = self.vae.encode(target_image.unsqueeze(0)).latent_dist.sample()  # Encode image
                 # target_image = target_image * 0.18215  # Scaling factor from VAE
                 target_image = target_image.squeeze(0)
         noise_image = torch.randn_like(target_image)
