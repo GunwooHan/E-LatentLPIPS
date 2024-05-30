@@ -206,6 +206,6 @@ class BCERankingLoss(nn.Module):
         self.loss = torch.nn.BCELoss()
 
     def forward(self, d0, d1, judge):
-        per = (judge + 1.) / 2.
+        per = judge
         self.logit = self.net.forward(d0, d1)
         return self.loss(self.logit, per)
