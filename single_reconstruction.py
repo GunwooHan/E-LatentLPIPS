@@ -18,7 +18,7 @@ parser.add_argument('--seed', type=int, default=42)
 parser.add_argument('--num_workers', type=int, default=8)
 
 parser.add_argument('--reconstruction_target', type=str, default='single_reconstruction_sample.jpeg')
-parser.add_argument('--lpips_model_path', type=str, default='checkpoints/origin/vgg-epoch=38-val/score=75.74.ckpt')
+parser.add_argument('--lpips_model_path', type=str, default='checkpoints/lpips/vgg-epoch=09-val/score=80.11.ckpt')
 parser.add_argument('--wandb', type=str, default=True)
 parser.add_argument('--iterations', type=int, default=100000)
 parser.add_argument('--latent_mode', type=bool, default=False)
@@ -55,8 +55,11 @@ class SingleReconstruction(pl.LightningModule):
 
         if self.latent_mode:
             self.lpips = e_latent_lpips.LPIPSModule.load_from_checkpoint(args.lpips_model_path, args=args)
+            self.lpips.eval()
         else:
-            self.lpips = LearnedPerceptualImagePatchSimilarity(net_type='vgg')
+            self.lpips = e_latent_lpips.LPIPSModule.load_from_checkpoint(args.lpips_model_path, args=args)
+            self.lpips.eval()
+            # self.lpips = LearnedPerceptualImagePatchSimilarity(net_type='vgg')
         self.psnr = PeakSignalNoiseRatio()
         self.model_trainalbe_set()
         self.encode_hidden_state = self.encode_text(
@@ -94,7 +97,7 @@ class SingleReconstruction(pl.LightningModule):
         # self.log("lpips_torch_loss", lpips_torch_loss, on_step=True, prog_bar=True)
         self.log("psnr_loss", psnr_loss, on_step=True, prog_bar=True)
 
-        if self.global_step % 500 == 0:
+        if self.global_step % 50 == 0:
             if args.latent_mode:
                 with torch.no_grad():
                     log_sample_image = self.vae.decode(y_hat).sample
