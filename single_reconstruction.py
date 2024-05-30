@@ -8,7 +8,7 @@ from diffusers import AutoencoderKL, StableDiffusionPipeline
 from pytorch_lightning.loggers import WandbLogger
 from torch import optim
 from torch.utils.data import DataLoader
-from torchmetrics.image import PeakSignalNoiseRatio
+from torchmetrics.image import PeakSignalNoiseRatio, LearnedPerceptualImagePatchSimilarity
 from torchvision import transforms
 
 from e_latent_lpips import e_latent_lpips
@@ -21,9 +21,11 @@ parser.add_argument('--reconstruction_target', type=str, default='single_reconst
 parser.add_argument('--lpips_model_path', type=str, default='checkpoints/origin/vgg-epoch=38-val/score=75.74.ckpt')
 parser.add_argument('--wandb', type=str, default=True)
 parser.add_argument('--iterations', type=int, default=100000)
-parser.add_argument('--latent_mode', type=bool, default=True)
+parser.add_argument('--latent_mode', type=bool, default=False)
 args = parser.parse_args()
 
+
+# torch.set_float32_matmul_precision('medium' | 'high')
 
 class SingleReconstruction(pl.LightningModule):
     def __init__(self, args):
@@ -49,11 +51,12 @@ class SingleReconstruction(pl.LightningModule):
         self.timestamp = args.seed
         self.text_encoder = pipe.text_encoder
         self.tokenizer = pipe.tokenizer
+        self.latent_mode = args.latent_mode
 
-        if args.latent_mode:
+        if self.latent_mode:
             self.lpips = e_latent_lpips.LPIPSModule.load_from_checkpoint(args.lpips_model_path, args=args)
-
-        # self.lpips_torch = LearnedPerceptualImagePatchSimilarity(net_type='vgg')
+        else:
+            self.lpips = LearnedPerceptualImagePatchSimilarity(net_type='vgg')
         self.psnr = PeakSignalNoiseRatio()
         self.model_trainalbe_set()
         self.encode_hidden_state = self.encode_text(
@@ -69,7 +72,17 @@ class SingleReconstruction(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        y_hat = self.model(x, args.seed, self.encode_hidden_state).sample
+
+        if self.latent_mode:
+            y_hat = self.model(x, args.seed, self.encode_hidden_state).sample
+        else:
+            x0 = self.vae.encode(x).latent_dist.sample()
+            x1 = self.model(x0, args.seed, self.encode_hidden_state).sample
+            y_hat = self.vae.decode(x1).sample
+
+            # Normalize y and y_hat to be in range -1 to 1
+            y = 2 * (y - y.min()) / (y.max() - y.min()) - 1
+            y_hat = 2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1
 
         lpips_loss = self.lpips(y, y_hat).flatten()
         psnr_loss = self.psnr(y, y_hat)
@@ -112,7 +125,9 @@ class SingleReconstructionDataModule(pl.LightningModule):
         self.num_workers = num_workers
         self.target_image_path = target_image_path
         self.transform = self.create_transforms()
-        self.vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-ema")
+
+        self.pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+        self.vae = self.pipe.vae
         self.vae.eval()
 
         image = Image.open(self.target_image_path)
