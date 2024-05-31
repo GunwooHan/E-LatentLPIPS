@@ -16,6 +16,7 @@ from e_latent_lpips import e_latent_lpips
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=42)
 parser.add_argument('--num_workers', type=int, default=8)
+parser.add_argument('--learninig_rate', type=float, default=0.0001)
 
 parser.add_argument('--reconstruction_target', type=str, default='single_reconstruction_sample.jpeg')
 parser.add_argument('--lpips_model_path', type=str, default='checkpoints/lpips/vgg-epoch=09-val/score=80.11.ckpt')
@@ -111,7 +112,7 @@ class SingleReconstruction(pl.LightningModule):
         pass
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=0.0001, betas=(0.9, 0.999))
+        optimizer = optim.AdamW(self.parameters(), lr=self.args.learning_rate)
         return optimizer
 
     def encode_text(self, text):

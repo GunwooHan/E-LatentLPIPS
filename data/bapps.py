@@ -77,6 +77,7 @@ class BAPPSDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=True,
+            pin_memory=True,
             shuffle=True
         )
 
@@ -86,6 +87,7 @@ class BAPPSDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=True,
+            pin_memory=True,
             shuffle=False
         )
 
@@ -95,6 +97,7 @@ class BAPPSDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             num_workers=self.num_workers,
             persistent_workers=True,
+            pin_memory=True,
             shuffle=False
         )
 
