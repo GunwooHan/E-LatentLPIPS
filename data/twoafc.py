@@ -1,6 +1,7 @@
 import glob
 import os.path
 
+from PIL import Image
 import cv2
 import numpy as np
 import torch
@@ -49,12 +50,13 @@ class TwoAFCDataset(Dataset):
     def apply_transform_with_seed(self, image_paths):
         transformed_images = []
 
-        p0_img = cv2.cvtColor(cv2.imread(image_paths[0]), cv2.COLOR_BGR2RGB)
-        p1_img = cv2.cvtColor(cv2.imread(image_paths[1]), cv2.COLOR_BGR2RGB)
-        ref_img = cv2.cvtColor(cv2.imread(image_paths[2]), cv2.COLOR_BGR2RGB)
+        p0_img = self.transform(Image.open(image_paths[0]).convert('RGB'))
+        p1_img = self.transform(Image.open(image_paths[1]).convert('RGB'))
+        ref_img = self.transform(Image.open(image_paths[2]).convert('RGB'))
 
-        transformed_img = self.transform(image=p0_img, image0=p1_img, image1=ref_img)
-        return transformed_img["image"], transformed_img["image0"], transformed_img["image1"]
+        # transformed_img = self.transform(image=p0_img, image0=p1_img, image1=ref_img)
+        # return transformed_img["image"], transformed_img["image0"], transformed_img["image1"]
+        return p0_img, p1_img, ref_img
 
 
 if __name__ == '__main__':
