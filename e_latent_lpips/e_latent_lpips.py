@@ -33,10 +33,10 @@ class LPIPSModule(pl.LightningModule):
         d1s = self.model(ref_img, p1_img)
         gts = judge_img
         scores = (d0s < d1s) * (1. - gts) + (d1s < d0s) * gts + (d1s == d0s) * .5
-        self.log("train/score", scores.mean() * 100, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("train_score", scores.mean() * 100, on_epoch=True, prog_bar=True, sync_dist=True)
 
         total_loss = self.rank_loss(d0s, d1s, gts)
-        self.log("train/total_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("train_total_loss", total_loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return total_loss
 
@@ -46,10 +46,10 @@ class LPIPSModule(pl.LightningModule):
         d1s = self.model(ref_img, p1_img)
         gts = judge_img
         scores = (d0s < d1s) * (1. - gts) + (d1s < d0s) * gts + (d1s == d0s) * .5
-        self.log("val/score", scores.mean() * 100, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("val_score", scores.mean() * 100, on_epoch=True, prog_bar=True, sync_dist=True)
 
         total_loss = self.rank_loss(d0s, d1s, gts)
-        self.log("val/total_loss", total_loss, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log("val_total_loss", total_loss, on_epoch=True, prog_bar=True, sync_dist=True)
 
         return total_loss
 
@@ -59,12 +59,12 @@ class LPIPSModule(pl.LightningModule):
         d1s = self.model(ref_img, p1_img)
         gts = judge_img
         scores = (d0s < d1s) * (1. - gts) + (d1s < d0s) * gts + (d1s == d0s) * .5
-        self.log("test/score", scores.mean() * 100, on_epoch=True, prog_bar=True)
+        self.log("test_score", scores.mean() * 100, on_epoch=True, prog_bar=True)
 
     def on_train_batch_end(self, *args: Any):
         for module in self.model.lins.modules():
             if (hasattr(module, 'weight') and module.kernel_size == (1, 1)):
-                module.weight.data = torch.clamp(module.weight.data, min=0)
+                module.weight.data = torch.clamp(module.weight.data, min=0.01)
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.args.learning_rate, betas=(0.9, 0.999))
