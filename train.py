@@ -2,7 +2,7 @@ import os
 import argparse
 
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging
+from pytorch_lightning.callbacks import ModelCheckpoint, StochasticWeightAveraging, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 
 from e_latent_lpips import e_latent_lpips
@@ -70,6 +70,7 @@ if __name__ == '__main__':
     )
 
     swa_callback = StochasticWeightAveraging(swa_lrs=args.swa_lr)
+    lr_callback = LearningRateMonitor(logging_interval='epoch')
 
     if args.wandb:
         tag = []
@@ -106,7 +107,7 @@ if __name__ == '__main__':
     trainer = pl.Trainer(
         devices=1,
         max_epochs=args.epochs,
-        callbacks=[checkpoint_callback, swa_callback],
+        callbacks=[checkpoint_callback, swa_callback, lr_callback],
         logger=wandb_logger if args.wandb else None,
     )
     trainer.fit(model, dm)
