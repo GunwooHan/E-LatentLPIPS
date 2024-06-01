@@ -6,6 +6,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import pytorch_lightning as pl
+from torch.optim.lr_scheduler import StepLR, ExponentialLR, ReduceLROnPlateau, CosineAnnealingWarmRestarts, \
+    CosineAnnealingLR, PolynomialLR
 
 from .pretrained_networks import LatentVGG16, VGG16
 
@@ -67,8 +69,52 @@ class LPIPSModule(pl.LightningModule):
                 module.weight.data = torch.clamp(module.weight.data, min=0.01)
 
     def configure_optimizers(self):
-        optimizer = optim.Adam(self.parameters(), lr=self.args.learning_rate, betas=(0.9, 0.999))
-        return optimizer
+        if self.args.optimizer == 'sgd':
+            optimizer = optim.SGD(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'adam':
+            optimizer = optim.Adam(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'adamw':
+            optimizer = optim.AdamW(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'adadelta':
+            optimizer = optim.Adadelta(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'adagrad':
+            optimizer = optim.Adagrad(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'adamax':
+            optimizer = optim.Adamax(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'asgd':
+            optimizer = optim.ASGD(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'lbfgs':
+            optimizer = optim.LBFGS(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'nadam':
+            optimizer = optim.NAdam(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'radam':
+            optimizer = optim.RAdam(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'rmsprop':
+            optimizer = optim.RMSprop(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'rprop':
+            optimizer = optim.Rprop(self.parameters(), lr=self.args.learning_rate)
+        else:
+            raise ValueError(f"Unsupported optimizer type: {self.args.optimizer}")
+        if self.args.lr_scheduler == 'constant':
+            return optimizer
+        elif self.args.lr_scheduler == 'step':
+            scheduler = StepLR(optimizer, step_size=self.args.step_size, gamma=self.args.gamma)
+        elif self.args.lr_scheduler == 'exponential':
+            scheduler = ExponentialLR(optimizer, gamma=self.args.gamma)
+        elif self.args.lr_scheduler == 'cosine_anneling':
+            scheduler = CosineAnnealingLR(optimizer, T_max=self.args.t_max, eta_min=1e-6)
+        elif self.args.lr_scheduler == 'cosine_anneling_warmup_restarts':
+            scheduler = CosineAnnealingWarmRestarts(optimizer, self.args.t_max, self.args.t_mult, eta_min=1e-6)
+        elif self.args.lr_scheduler == 'reduce_on_plateau':
+            scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=self.args.gamma, patience=self.args.patience)
+        else:
+            raise ValueError(f"Unsupported scheduler type: {self.args.lr_scheduler}")
+
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': scheduler,
+            'monitor': 'val_loss'  # This is necessary for ReduceLROnPlateau
+        }
 
     def load_checkpoint(self, model_path):
         self.load_state_dict(torch.load(model_path, map_location='cpu'), strict=False)
