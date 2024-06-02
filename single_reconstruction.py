@@ -1,25 +1,31 @@
 import argparse
 
+
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
 from PIL import Image
-from diffusers import AutoencoderKL, StableDiffusionPipeline
+from diffusers import AutoencoderKL, StableDiffusionPipeline, UNet2DModel
 from pytorch_lightning.loggers import WandbLogger
 from torch import optim
 from torch.utils.data import DataLoader
 from torchmetrics.image import PeakSignalNoiseRatio, LearnedPerceptualImagePatchSimilarity
 from torchvision import transforms
+from torch.optim.lr_scheduler import StepLR, ExponentialLR, ReduceLROnPlateau
 
 from e_latent_lpips import e_latent_lpips
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=42)
 parser.add_argument('--num_workers', type=int, default=8)
-parser.add_argument('--learninig_rate', type=float, default=0.0001)
+parser.add_argument('--learning_rate', type=float, default=0.01)
+parser.add_argument('--optimizer', type=str, default="sgd")
+parser.add_argument('--step_size', type=int, default=1)
+parser.add_argument('--gamma', type=float, default=0.5)
+parser.add_argument('--lr_scheduler', type=str, default="constant")
 
 parser.add_argument('--reconstruction_target', type=str, default='single_reconstruction_sample.jpeg')
-parser.add_argument('--lpips_model_path', type=str, default='checkpoints/lpips/vgg-epoch=09-val/score=80.11.ckpt')
+parser.add_argument('--lpips_model_path', type=str, default='checkpoints/vgg_scratch.ckpt')
 parser.add_argument('--wandb', type=str, default=True)
 parser.add_argument('--iterations', type=int, default=100000)
 parser.add_argument('--latent_mode', type=bool, default=False)
@@ -32,6 +38,14 @@ class SingleReconstruction(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.save_hyperparameters(args)
+        self.model = UNet2DModel(
+            in_channels=4,  # the number of input channels, 3 for RGB images
+            out_channels=4,  # the number of output channels
+            layers_per_block=2,  # how many ResNet layers to use per UNet block
+            block_out_channels=(256, 512, 512),
+            down_block_types=("DownBlock2D", "AttnDownBlock2D", "DownBlock2D"),
+            up_block_types=("UpBlock2D", "AttnUpBlock2D", "UpBlock2D"),
+        )
         # self.model = UNet2DModel(
         #     in_channels=4 if args.latent_mode else 3,  # the number of input channels, 3 for RGB images
         #     out_channels=4 if args.latent_mode else 3,  # the number of output channels
@@ -45,10 +59,14 @@ class SingleReconstruction(pl.LightningModule):
         # model_id = "CompVis/stable-diffusion-v1-5"
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        self.gamma = args.gamma
+        self.step_size = args.step_size
+        self.args = args
+
         pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
         pipe = pipe.to(device)
         self.vae = pipe.vae
-        self.model = pipe.unet
+        # self.model = pipe.unet
         self.timestamp = args.seed
         self.text_encoder = pipe.text_encoder
         self.tokenizer = pipe.tokenizer
@@ -81,7 +99,7 @@ class SingleReconstruction(pl.LightningModule):
             y_hat = self.model(x, args.seed, self.encode_hidden_state).sample
         else:
             x0 = self.vae.encode(x).latent_dist.sample()
-            x1 = self.model(x0, args.seed, self.encode_hidden_state).sample
+            x1 = self.model(x0, args.seed).sample
             y_hat = self.vae.decode(x1).sample
 
             # Normalize y and y_hat to be in range -1 to 1
@@ -112,8 +130,51 @@ class SingleReconstruction(pl.LightningModule):
         pass
 
     def configure_optimizers(self):
-        optimizer = optim.AdamW(self.parameters(), lr=self.args.learning_rate)
-        return optimizer
+        if self.args.optimizer == 'sgd':
+            optimizer = optim.SGD(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'adam':
+            optimizer = optim.Adam(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'adamw':
+            optimizer = optim.AdamW(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'adadelta':
+            optimizer = optim.Adadelta(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'adagrad':
+            optimizer = optim.Adagrad(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'sparse_adam':
+            optimizer = optim.SparseAdam(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'adamax':
+            optimizer = optim.Adamax(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'asgd':
+            optimizer = optim.ASGD(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'lbfgs':
+            optimizer = optim.LBFGS(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'nadam':
+            optimizer = optim.NAdam(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'radam':
+            optimizer = optim.RAdam(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'rmsprop':
+            optimizer = optim.RMSprop(self.parameters(), lr=self.args.learning_rate)
+        elif self.args.optimizer == 'rprop':
+            optimizer = optim.Rprop(self.parameters(), lr=self.args.learning_rate)
+        else:
+            raise ValueError(f"Unsupported optimizer type: {self.args.optimizer}")
+
+        if self.args.lr_scheduler == 'constant':
+            return optimizer
+        elif self.args.lr_scheduler == 'step':
+            scheduler = StepLR(optimizer, step_size=self.args.step_size, gamma=self.args.gamma)
+        elif self.args.lr_scheduler == 'exponential':
+            scheduler = ExponentialLR(optimizer, gamma=self.args.gamma)
+        elif self.args.lr_scheduler == 'reduce_on_plateau':
+            scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=self.args.factor, patience=self.args.patience)
+        else:
+            raise ValueError(f"Unsupported scheduler type: {self.args.lr_scheduler}")
+
+        return {
+            'optimizer': optimizer,
+            'lr_scheduler': scheduler,
+            'monitor': 'val_loss'  # This is necessary for ReduceLROnPlateau
+        }
 
     def encode_text(self, text):
         inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True)
