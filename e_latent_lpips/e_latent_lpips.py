@@ -105,7 +105,7 @@ class LPIPSModule(pl.LightningModule):
         elif self.args.lr_scheduler == 'cosine_anneling':
             scheduler = CosineAnnealingLR(optimizer, T_max=self.args.t_max, eta_min=1e-6)
         elif self.args.lr_scheduler == 'cosine_anneling_warmup_restarts':
-            scheduler = CosineAnnealingWarmUpRestarts(optimizer,  T_0=10, T_mult=1, eta_max=0.1,  T_up=5, gamma=self.args.gamma)
+            scheduler = CosineAnnealingWarmUpRestarts(optimizer,  T_0=10, T_mult=1, eta_max=0.001,  T_up=5, gamma=self.args.gamma)
         elif self.args.lr_scheduler == 'reduce_on_plateau':
             scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=self.args.gamma, patience=self.args.patience)
         else:
