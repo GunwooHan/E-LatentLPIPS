@@ -12,31 +12,19 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--batch_size', type=int, default=50)
-    parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--epochs', type=int, default=100)
     parser.add_argument('--learning_rate', type=float, default=1e-5)
     parser.add_argument('--num_workers', type=int, default=0)
     parser.add_argument('--wandb', type=bool, default=True)
     parser.add_argument('--optimizer', type=str, default="sgd")
-    parser.add_argument('--step_size', type=int, default=1)
+    parser.add_argument('--step_size', type=int, default=10)
     parser.add_argument('--gamma', type=float, default=0.5)
-    parser.add_argument('--lr_scheduler', type=str, default="cosine_anneling")
+    parser.add_argument('--lr_scheduler', type=str, default="step")
     parser.add_argument('--factor', type=float, default=0.5)
     parser.add_argument('--patience', type=int, default=5)
     parser.add_argument('--t_max', type=int, default=5)
     parser.add_argument('--t_mult', type=int, default=5)
     parser.add_argument('--swa_lr', type=float, default=1e-4)
-
-    # parser.add_argument('--crop_image_size', type=int, default=512)
-    # parser.add_argument('--ShiftScaleRotateMode', type=int, default=4)
-    # parser.add_argument('--ShiftScaleRotate', type=float, default=0.2)
-    # parser.add_argument('--horizontal_flip', type=float, default=0.2)
-    # parser.add_argument('--rotate_90_degrees', type=float, default=0.2)
-    # parser.add_argument('--VerticalFlip', type=float, default=0.2)
-
-    parser.add_argument('--blit', type=bool, default=False)
-    parser.add_argument('--geometric', type=bool, default=False)
-    parser.add_argument('--color', type=bool, default=False)
-    parser.add_argument('--cutout', type=bool, default=False)
 
     parser.add_argument('--model', type=str, default='vgg')
     parser.add_argument('--checkpoints_dir', type=str, default='checkpoints')
@@ -54,7 +42,6 @@ if __name__ == '__main__':
                                  'val/superres'])
 
     args = parser.parse_args()
-    print(args)
 
     pl.seed_everything(args.seed)
 
@@ -70,23 +57,10 @@ if __name__ == '__main__':
     )
 
     swa_callback = StochasticWeightAveraging(swa_lrs=args.swa_lr)
-    lr_callback = LearningRateMonitor(logging_interval='epoch')
+    lr_callback = LearningRateMonitor(logging_interval='step')
 
     if args.wandb:
         tag = []
-
-        if args.blit:
-            tag.append('blit')
-        if args.geometric:
-            tag.append('geometric')
-        if args.cutout:
-            tag.append('cutout')
-        if args.color:
-            tag.append('color')
-
-        if args.latent_mode:
-            tag.append('Latent')
-
         tag += args.train_dataset_dir
         tag += args.val_dataset_dir
 
