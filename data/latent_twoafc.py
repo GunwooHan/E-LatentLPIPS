@@ -37,9 +37,9 @@ class LatentTwoAFCDataset(Dataset):
         judge_img = torch.FloatTensor(judge_img)
 
         # For Debug
-        # import torchvision.utils as vutils
-        # temp_tensor = [p0_img, p1_img, ref_img]
-        # vutils.save_image(temp_tensor, "output.jpg", nrow=3, normalize=True)
+        import torchvision.utils as vutils
+        temp_tensor = [p0_img, p1_img, ref_img]
+        vutils.save_image(temp_tensor, "output.png", nrow=3, normalize=True)
 
         return p0_img, p1_img, ref_img, judge_img
 
@@ -47,20 +47,22 @@ class LatentTwoAFCDataset(Dataset):
         return len(self.p0_paths)
 
     def apply_transform_with_seed(self, image_paths):
-        p0_img = np.load(image_paths[0]).transpose((1, 2, 0))
-        p1_img = np.load(image_paths[1]).transpose((1, 2, 0))
-        ref_img = np.load(image_paths[2]).transpose((1, 2, 0))
+        p0_img = torch.load(image_paths[0])
+        p1_img = torch.load(image_paths[1])
+        ref_img = torch.load(image_paths[2])
 
         p0_img = (p0_img - p0_img.min()) / (p0_img.max() - p0_img.min())
         p1_img = (p1_img - p1_img.min()) / (p1_img.max() - p1_img.min())
         ref_img = (ref_img - ref_img.min()) / (ref_img.max() - ref_img.min())
 
+        p0_img = self.transform(p0_img)
+        p1_img = self.transform(p1_img)
+        ref_img = self.transform(ref_img)
+
         p0_img = p0_img * 2 - 1
         p1_img = p1_img * 2 - 1
         ref_img = ref_img * 2 - 1
-
-        transformed_img = self.transform(image=p0_img, image0=p1_img, image1=ref_img)
-        return transformed_img["image"], transformed_img["image0"], transformed_img["image1"]
+        return p0_img, p1_img, ref_img
 
 
 if __name__ == '__main__':

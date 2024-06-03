@@ -3,18 +3,29 @@ from albumentations.pytorch import ToTensorV2
 from torchvision.transforms import transforms
 
 def create_train_transforms(args=None):
-    return transforms.Compose([
-        transforms.Resize(64),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
+    if not args.latent_mode:
+        return transforms.Compose([
+            transforms.Resize(64),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+    else:
+        return transforms.Compose([
+            transforms.Resize(64),
+        ])
+
 
 def create_valid_transforms(args=None):
-    return transforms.Compose([
-        transforms.Resize(64),
-        transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-    ])
+    if not args.latent_mode:
+        return transforms.Compose([
+            transforms.Resize(64),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+    else:
+        return transforms.Compose([
+            transforms.Resize(64),
+        ])
 
 # def create_train_transforms(args=None):
 #     transform = []
