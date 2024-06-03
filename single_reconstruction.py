@@ -29,6 +29,7 @@ parser.add_argument('--lpips_model_path', type=str, default='checkpoints/vgg_scr
 parser.add_argument('--wandb', type=str, default=True)
 parser.add_argument('--iterations', type=int, default=100000)
 parser.add_argument('--latent_mode', type=bool, default=False)
+parser.add_argument('--baseline', type=bool, default=False)
 args = parser.parse_args()
 
 
@@ -71,14 +72,17 @@ class SingleReconstruction(pl.LightningModule):
         self.text_encoder = pipe.text_encoder
         self.tokenizer = pipe.tokenizer
         self.latent_mode = args.latent_mode
+        self.baseline = args.baseline
 
         if self.latent_mode:
             self.lpips = e_latent_lpips.LPIPSModule.load_from_checkpoint(args.lpips_model_path, args=args)
             self.lpips.eval()
         else:
-            self.lpips = e_latent_lpips.LPIPSModule.load_from_checkpoint(args.lpips_model_path, args=args)
+            if self.baseline:
+                self.lpips = LearnedPerceptualImagePatchSimilarity(net_type='vgg')
+            else:
+                self.lpips = e_latent_lpips.LPIPSModule.load_from_checkpoint(args.lpips_model_path, args=args)
             self.lpips.eval()
-            # self.lpips = LearnedPerceptualImagePatchSimilarity(net_type='vgg')
         self.psnr = PeakSignalNoiseRatio()
         self.model_trainalbe_set()
         self.encode_hidden_state = self.encode_text(
@@ -257,6 +261,7 @@ if __name__ == '__main__':
     trainer = pl.Trainer(
         devices=1,
         max_steps=args.iterations,
-        logger=wandb_logger if args.wandb else None
+        logger=wandb_logger if args.wandb else None,
+        log_every_n_steps=1,
     )
     trainer.fit(model, train_dataloaders=dm.train_dataloader())
