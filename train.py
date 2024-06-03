@@ -46,7 +46,7 @@ if __name__ == '__main__':
     pl.seed_everything(args.seed)
 
     if not os.path.exists(args.checkpoints_dir):
-        os.mkdir(args.checkpoints_dir)
+        os.makedirs(args.checkpoints_dir, exist_ok=True)
 
     checkpoint_callback = ModelCheckpoint(
         dirpath=args.checkpoints_dir,
