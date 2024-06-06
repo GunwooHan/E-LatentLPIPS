@@ -37,9 +37,9 @@ class LatentTwoAFCDataset(Dataset):
         judge_img = torch.FloatTensor(judge_img)
 
         # For Debug
-        import torchvision.utils as vutils
-        temp_tensor = [p0_img, p1_img, ref_img]
-        vutils.save_image(temp_tensor, "output.png", nrow=3, normalize=True)
+        # import torchvision.utils as vutils
+        # temp_tensor = [p0_img, p1_img, ref_img]
+        # vutils.save_image(temp_tensor, "output.png", nrow=3, normalize=True)
 
         return p0_img, p1_img, ref_img, judge_img
 
