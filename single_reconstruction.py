@@ -1,9 +1,9 @@
 import argparse
 
-
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
+import torchvision.transforms
 from PIL import Image
 from diffusers import AutoencoderKL, StableDiffusionPipeline, UNet2DModel
 from pytorch_lightning.loggers import WandbLogger
@@ -17,19 +17,20 @@ from e_latent_lpips import e_latent_lpips
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=42)
-parser.add_argument('--num_workers', type=int, default=8)
-parser.add_argument('--learning_rate', type=float, default=0.01)
-parser.add_argument('--optimizer', type=str, default="sgd")
-parser.add_argument('--step_size', type=int, default=1)
+parser.add_argument('--num_workers', type=int, default=0)
+parser.add_argument('--learning_rate', type=float, default=0.0001)
+parser.add_argument('--optimizer', type=str, default="adam")
+parser.add_argument('--step_size', type=int, default=10)
 parser.add_argument('--gamma', type=float, default=0.5)
 parser.add_argument('--lr_scheduler', type=str, default="constant")
 
 parser.add_argument('--reconstruction_target', type=str, default='single_reconstruction_sample.jpeg')
 parser.add_argument('--lpips_model_path', type=str, default='checkpoints/vgg_scratch.ckpt')
-parser.add_argument('--wandb', type=str, default=True)
+parser.add_argument('--wandb', type=bool, default=True)
 parser.add_argument('--iterations', type=int, default=100000)
 parser.add_argument('--latent_mode', type=bool, default=False)
 parser.add_argument('--baseline', type=bool, default=False)
+parser.add_argument('--ensemble_mode', type=bool, default=False)
 args = parser.parse_args()
 
 
@@ -63,6 +64,7 @@ class SingleReconstruction(pl.LightningModule):
         self.gamma = args.gamma
         self.step_size = args.step_size
         self.args = args
+        self.ensemble_mode = args.ensemble_mode
 
         pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
         pipe = pipe.to(device)
@@ -88,6 +90,29 @@ class SingleReconstruction(pl.LightningModule):
         self.encode_hidden_state = self.encode_text(
             "The image shows a majestic castle on a hill, reflected in a calm body of water, under a starry night sky with a full moon. The castle is made of tan stone, has multiple pointed towers, and a flag on the central tower. ")
 
+        if self.ensemble_mode:
+            self.ensemble_transform = self.create_ensemble_transform()
+
+    def create_ensemble_transform(self):
+        transform = []
+        transform.append(transforms.RandomHorizontalFlip())
+        transform.append(transforms.RandomRotation(degrees=[90, 90],
+                                                   interpolation=torchvision.transforms.InterpolationMode.BILINEAR))
+        transform.append(transforms.RandomAffine(degrees=30, translate=(0.2, 0.2)))
+        transform.append(transforms.RandomErasing(p=1.0, scale=(0.02, 0.33), ratio=(0.3, 3.3)))
+        transform.append(transforms.RandomResizedCrop(size=64, scale=(0.8, 1.2), ratio=(1.0, 1.0)))
+        return transforms.Compose(transform)
+        # Isotropic scaling (uniform scaling)
+
+        # # Brightness adjustment
+        # brightness = transforms.ColorJitter(brightness=0.5)
+        #
+        # # Saturation adjustment
+        # saturation = transforms.ColorJitter(saturation=0.5)
+        #
+        # # Random contrast
+        # random_contrast = transforms.ColorJitter(contrast=0.5)
+
     def model_trainalbe_set(self):
         for name, param in self.text_encoder.named_parameters():
             param.requires_grad = False
@@ -98,19 +123,31 @@ class SingleReconstruction(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
+        y = y * 0.18215
 
         if self.latent_mode:
-            y_hat = self.model(x, args.seed, self.encode_hidden_state).sample
+            # y_hat = self.model(x, args.seed, self.encode_hidden_state).sample
+            y_hat = self.model(x, args.seed).sample
+            # y = 2 * (y - y.min()) / (y.max() - y.min()) - 1
+            # y_hat = 2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1
         else:
             x0 = self.vae.encode(x).latent_dist.sample()
             x1 = self.model(x0, args.seed).sample
             y_hat = self.vae.decode(x1).sample
+            #
+            # # Normalize y and y_hat to be in range -1 to 1
+            # y = 2 * (y - y.min()) / (y.max() - y.min()) - 1
+            # y_hat = 2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1
 
-            # Normalize y and y_hat to be in range -1 to 1
-            y = 2 * (y - y.min()) / (y.max() - y.min()) - 1
-            y_hat = 2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1
-
-        lpips_loss = self.lpips(y, y_hat).flatten()
+        if self.ensemble_mode:
+            transformed_y_y_hat = self.ensemble_transform(torch.cat([y, y_hat], dim=0))
+            y = transformed_y_y_hat[:y.size(0), ...]
+            y_hat = transformed_y_y_hat[y.size(0):, ...]
+            lpips_loss = self.lpips(2 * (y - y.min()) / (y.max() - y.min()) - 1,
+                                    2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1).flatten()
+        else:
+            lpips_loss = self.lpips(2 * (y - y.min()) / (y.max() - y.min()) - 1,
+                                    2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1).flatten()
         psnr_loss = self.psnr(y, y_hat)
         # y = (y - y.min()) / (y.max() - y.min()) * 2 - 1
         # y_hat = (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) * 2 - 1
@@ -120,10 +157,10 @@ class SingleReconstruction(pl.LightningModule):
         # self.log("lpips_torch_loss", lpips_torch_loss, on_step=True, prog_bar=True)
         self.log("psnr_loss", psnr_loss, on_step=True, prog_bar=True)
 
-        if self.global_step % 50 == 0:
+        if self.global_step % 500 == 0:
             if args.latent_mode:
                 with torch.no_grad():
-                    log_sample_image = self.vae.decode(y_hat).sample
+                    log_sample_image = self.vae.decode(y_hat / 0.18215).sample
                     self.logger.log_image("reconstruction", [log_sample_image], step=self.global_step + 1)
             else:
                 self.logger.log_image("reconstruction", [y_hat], step=self.global_step + 1)
@@ -170,14 +207,14 @@ class SingleReconstruction(pl.LightningModule):
         elif self.args.lr_scheduler == 'exponential':
             scheduler = ExponentialLR(optimizer, gamma=self.args.gamma)
         elif self.args.lr_scheduler == 'reduce_on_plateau':
-            scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=self.args.factor, patience=self.args.patience)
+            scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=self.args.gamma, patience=5)
         else:
             raise ValueError(f"Unsupported scheduler type: {self.args.lr_scheduler}")
 
         return {
             'optimizer': optimizer,
             'lr_scheduler': scheduler,
-            'monitor': 'val_loss'  # This is necessary for ReduceLROnPlateau
+            'monitor': 'lpips_loss'  # This is necessary for ReduceLROnPlateau
         }
 
     def encode_text(self, text):
@@ -216,7 +253,6 @@ class SingleReconstructionDataModule(pl.LightningModule):
             self.dataset,
             batch_size=1,
             num_workers=self.num_workers,
-            persistent_workers=True,
         )
 
     def create_transforms(self):
@@ -233,7 +269,7 @@ class SingleReconstructionDataset(torch.utils.data.Dataset):
         self.target_image = target_image
 
     def __len__(self):
-        return 100000
+        return 1000
 
     def __getitem__(self, idx):
         return self.noise_image, self.target_image
@@ -259,9 +295,8 @@ if __name__ == '__main__':
     model = SingleReconstruction(args)
 
     trainer = pl.Trainer(
+        max_epochs=100,
         devices=1,
-        max_steps=args.iterations,
         logger=wandb_logger if args.wandb else None,
-        log_every_n_steps=1,
     )
     trainer.fit(model, train_dataloaders=dm.train_dataloader())
