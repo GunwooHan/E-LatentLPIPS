@@ -141,10 +141,10 @@ class SingleReconstruction(pl.LightningModule):
 
         if self.ensemble_mode:
             transformed_y_y_hat = self.ensemble_transform(torch.cat([y, y_hat], dim=0))
-            y = transformed_y_y_hat[:y.size(0), ...]
-            y_hat = transformed_y_y_hat[y.size(0):, ...]
-            lpips_loss = self.lpips(2 * (y - y.min()) / (y.max() - y.min()) - 1,
-                                    2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1).flatten()
+            y_transformed = transformed_y_y_hat[:y.size(0), ...]
+            y_hat_transformed = transformed_y_y_hat[y.size(0):, ...]
+            lpips_loss = self.lpips(2 * (y_transformed - y_transformed.min()) / (y_transformed.max() - y_transformed.min()) - 1,
+                                    2 * (y_hat_transformed - y_hat_transformed.min()) / (y_hat_transformed.max() - y_hat_transformed.min()) - 1).flatten()
         else:
             lpips_loss = self.lpips(2 * (y - y.min()) / (y.max() - y.min()) - 1,
                                     2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1).flatten()
