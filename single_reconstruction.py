@@ -49,14 +49,14 @@ class SingleReconstruction(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.save_hyperparameters(args)
-        self.model = UNet2DModel(
-            in_channels=4,  # the number of input channels, 3 for RGB images
-            out_channels=4,  # the number of output channels
-            layers_per_block=2,  # how many ResNet layers to use per UNet block
-            block_out_channels=(256, 512, 512),
-            down_block_types=("DownBlock2D", "AttnDownBlock2D", "DownBlock2D"),
-            up_block_types=("UpBlock2D", "AttnUpBlock2D", "UpBlock2D"),
-        )
+        # self.model = UNet2DModel(
+        #     in_channels=4,  # the number of input channels, 3 for RGB images
+        #     out_channels=4,  # the number of output channels
+        #     layers_per_block=2,  # how many ResNet layers to use per UNet block
+        #     block_out_channels=(256, 512, 512),
+        #     down_block_types=("DownBlock2D", "AttnDownBlock2D", "DownBlock2D"),
+        #     up_block_types=("UpBlock2D", "AttnUpBlock2D", "UpBlock2D"),
+        # )
         # self.model = UNet2DModel(
         #     in_channels=4 if args.latent_mode else 3,  # the number of input channels, 3 for RGB images
         #     out_channels=4 if args.latent_mode else 3,  # the number of output channels
@@ -78,7 +78,7 @@ class SingleReconstruction(pl.LightningModule):
         pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
         pipe = pipe.to(device)
         self.vae = pipe.vae
-        # self.model = pipe.unet
+        self.model = pipe.unet
         self.timestamp = args.seed
         self.text_encoder = pipe.text_encoder
         self.tokenizer = pipe.tokenizer
@@ -144,8 +144,8 @@ class SingleReconstruction(pl.LightningModule):
         y = y * 0.18215
 
         if self.latent_mode:
-            # y_hat = self.model(x, args.seed, self.encode_hidden_state).sample
-            y_hat = self.model(x, args.seed).sample
+            y_hat = self.model(x, args.seed, self.encode_hidden_state).sample
+            # y_hat = self.model(x, args.seed).sample
             # y = 2 * (y - y.min()) / (y.max() - y.min()) - 1
             # y_hat = 2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1
         else:
