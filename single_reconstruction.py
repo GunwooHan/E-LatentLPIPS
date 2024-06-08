@@ -115,14 +115,14 @@ class SingleReconstruction(pl.LightningModule):
         if self.args.flip:
             transform.append(transforms.RandomHorizontalFlip())
         if self.args.rotation:
-            transform.append(transforms.RandomRotation(degrees=[90, 90],
+            transform.append(transforms.RandomRotation(degrees=[-90, 90],
                                                        interpolation=torchvision.transforms.InterpolationMode.BILINEAR))
         if self.args.translation:
             transform.append(transforms.RandomAffine(degrees=30, translate=(0.2, 0.2)))
         if self.args.cutout:
-            transform.append(transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3)))
+            transform.append(transforms.RandomErasing(p=1, scale=(0.02, 0.33), ratio=(0.3, 3.3)))
         if self.args.resize:
-            transform.append(transforms.RandomResizedCrop(size=64, scale=(0.8, 1.2), ratio=(1.0, 1.0)))
+            transform.append(transforms.RandomResizedCrop(size=64, scale=(0.5, 1.5), ratio=(0.5, 1.5)))
         if self.args.bright:
             transform.append(BrightnessAdjust(1))
         if self.args.contrast:
