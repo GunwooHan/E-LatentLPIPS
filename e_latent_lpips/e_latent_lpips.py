@@ -65,7 +65,7 @@ class LPIPSModule(pl.LightningModule):
     def on_train_batch_end(self, *args: Any):
         for module in self.model.lins.modules():
             if (hasattr(module, 'weight') and module.kernel_size == (1, 1)):
-                module.weight.data = torch.clamp(module.weight.data, min=0.01)
+                module.weight.data = torch.clamp(module.weight.data, min=0)
 
     def configure_optimizers(self):
         if self.args.optimizer == 'sgd':

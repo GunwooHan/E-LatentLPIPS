@@ -11,7 +11,6 @@ def create_train_transforms(args=None):
         ])
     else:
         return transforms.Compose([
-            transforms.Resize(64),
         ])
 
 
@@ -24,7 +23,6 @@ def create_valid_transforms(args=None):
         ])
     else:
         return transforms.Compose([
-            transforms.Resize(64),
         ])
 
 # def create_train_transforms(args=None):
