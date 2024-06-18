@@ -19,11 +19,11 @@ from augment import AugmentPipe
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=42)
-parser.add_argument('--num_workers', type=int, default=0)
-parser.add_argument('--learning_rate', type=float, default=0.0001)
+parser.add_argument('--num_workers', type=int, default=16)
+parser.add_argument('--learning_rate', type=float, default=0.00001)
 parser.add_argument('--optimizer', type=str, default="adam")
 parser.add_argument('--step_size', type=int, default=10)
-parser.add_argument('--batch_size', type=int, default=50)
+parser.add_argument('--batch_size', type=int, default=1)
 parser.add_argument('--gamma', type=float, default=0.5)
 parser.add_argument('--lr_scheduler', type=str, default="constant")
 
@@ -34,25 +34,35 @@ parser.add_argument('--lr_scheduler', type=str, default="constant")
 # parser.add_argument('--noise', type=bool, default=False)
 # parser.add_argument('--cutout', type=bool, default=False)
 
-parser.add_argument('--xflip', type=bool, default=False)
-parser.add_argument('--rotate90', type=bool, default=False)
-parser.add_argument('--xint', type=bool, default=False)
-parser.add_argument('--scale', type=bool, default=False)
+parser.add_argument('--xflip', type=bool, default=True)
+parser.add_argument('--rotate90', type=bool, default=True)
+parser.add_argument('--xint', type=bool, default=True)
+parser.add_argument('--scale', type=bool, default=True)
 parser.add_argument('--rotate', type=bool, default=True)
-parser.add_argument('--aniso', type=bool, default=False)
-parser.add_argument('--xfrac', type=bool, default=False)
-parser.add_argument('--brightness', type=bool, default=False)
-parser.add_argument('--contrast', type=bool, default=False)
+parser.add_argument('--aniso', type=bool, default=True)
+parser.add_argument('--xfrac', type=bool, default=True)
+parser.add_argument('--brightness', type=bool, default=True)
+parser.add_argument('--contrast', type=bool, default=True)
 parser.add_argument('--lumaflip', type=bool, default=False)
 parser.add_argument('--hue', type=bool, default=False)
-parser.add_argument('--saturation', type=bool, default=False)
+parser.add_argument('--saturation', type=bool, default=True)
 parser.add_argument('--imgfilter', type=bool, default=False)
-parser.add_argument('--noise', type=bool, default=False)
-parser.add_argument('--cutout', type=bool, default=False)
+parser.add_argument('--noise', type=bool, default=True)
+parser.add_argument('--cutout', type=bool, default=True)
 
-parser.add_argument('--reconstruction_target', type=str, default='single_reconstruction_sample.jpeg')
+parser.add_argument('--brightness_std', type=float, default=0.2)
+parser.add_argument('--contrast_std', type=float, default=0.5)
+parser.add_argument('--scale_std', type=float, default=0.2)
+parser.add_argument('--rotate_max', type=float, default=1)
+parser.add_argument('--aniso_std', type=float, default=0.2)
+parser.add_argument('--xfrac_std', type=float, default=0.125)
+parser.add_argument('--saturation_std', type=float, default=1)
+parser.add_argument('--noise_std', type=float, default=1)
+parser.add_argument('--cutout_size', type=float, default=0.5)
+
+parser.add_argument('--reconstruction_target', type=str, default='/dev/shm/single_reconstruction_sample.jpeg')
 parser.add_argument('--lpips_model_path', type=str,
-                    default='checkpoints/epoch10_latent_32/vgg-epoch=02-val_score=64.04.ckpt')
+                    default='checkpoints/latent_2afc/vgg-epoch=85-val_score=63.95.ckpt')
 parser.add_argument('--wandb', type=bool, default=True)
 parser.add_argument('--iterations', type=int, default=100000)
 parser.add_argument('--latent_mode', type=bool, default=True)
@@ -120,6 +130,8 @@ class SingleReconstruction(pl.LightningModule):
         if self.ensemble_mode:
             self.ensemble_transform = self.create_ensemble_transform().to(device)
 
+        self.lpips_metric = LearnedPerceptualImagePatchSimilarity(net_type='vgg')
+
     def model_trainalbe_set(self):
         for name, param in self.text_encoder.named_parameters():
             param.requires_grad = False
@@ -162,7 +174,15 @@ class SingleReconstruction(pl.LightningModule):
             imgfilter=1 if self.args.imgfilter else 0,
             noise=1 if self.args.noise else 0,
             cutout=1 if self.args.cutout else 0,
-            brightness_std=1, contrast_std=1, noise_std=1
+            brightness_std=args.brightness_std,
+            contrast_std=args.contrast_std,
+            scale_std=args.scale_std,
+            rotate_max=args.rotate_max,
+            aniso_std=args.aniso_std,
+            xfrac_std=args.xfrac_std,
+            saturation_std=args.saturation_std,
+            noise_std=args.noise_std,
+            cutout_size=args.cutout_size,
         )
 
         # Isotropic scaling (uniform scaling)
@@ -178,12 +198,12 @@ class SingleReconstruction(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        if self.latent_mode and batch_idx==0:
+        if self.latent_mode and batch_idx == 0:
             self.scaled_y_encode = self.vae.encode(y).latent_dist.sample() * 0.18215
 
         if self.latent_mode:
             # y_hat = self.model(x, args.seed, self.encode_hidden_state).sample
-            scaled_latent = x #* 0.18215
+            scaled_latent = x  # * 0.18215
             unet_output = self.model(scaled_latent, args.seed).sample
 
             # y = 2 * (y - y.min()) / (y.max() - y.min()) - 1
@@ -206,20 +226,21 @@ class SingleReconstruction(pl.LightningModule):
             #     transformed_unet_outputs_list.append(transformed[:1, ...])
             #     transformed_scaled_y_encode_list.append(transformed[1:, ...])
 
-            transformed_unet_outputs, transformed_scaled_y_encode = self.ensemble_transform(unet_output, self.scaled_y_encode)
+            transformed_unet_outputs, transformed_scaled_y_encode = self.ensemble_transform(unet_output,
+                                                                                            self.scaled_y_encode)
 
             # transformed_unet_outputs = torch.cat(transformed_unet_outputs_list, dim=0)
             # transformed_scaled_y_encode = torch.cat(transformed_scaled_y_encode_list, dim=0)
 
             lpips_loss = self.lpips(
                 2 * (transformed_unet_outputs - transformed_unet_outputs.min()) / (
-                            transformed_unet_outputs.max() - transformed_unet_outputs.min()) - 1,
+                        transformed_unet_outputs.max() - transformed_unet_outputs.min()) - 1,
                 2 * (transformed_scaled_y_encode - transformed_scaled_y_encode.min()) / (
-                            transformed_scaled_y_encode.max() - transformed_scaled_y_encode.min()) - 1).mean()
+                        transformed_scaled_y_encode.max() - transformed_scaled_y_encode.min()) - 1).mean()
         else:
             lpips_loss = self.lpips(2 * (unet_output - unet_output.min()) / (unet_output.max() - unet_output.min()) - 1,
                                     2 * (self.scaled_y_encode - self.scaled_y_encode.min()) / (
-                                                self.scaled_y_encode.max() - self.scaled_y_encode.min()) - 1).mean()
+                                            self.scaled_y_encode.max() - self.scaled_y_encode.min()) - 1).mean()
         # y = (y - y.min()) / (y.max() - y.min()) * 2 - 1
         # y_hat = (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) * 2 - 1
         # lpips_torch_loss = self.lpips_torch(y, y_hat)
@@ -227,13 +248,15 @@ class SingleReconstruction(pl.LightningModule):
         self.log("lpips_loss", lpips_loss, on_step=True, prog_bar=True)
         # self.log("lpips_torch_loss", lpips_torch_loss, on_step=True, prog_bar=True)
 
-        if batch_idx % 100 == 0:
+        if batch_idx % 5000 == 0:
             if args.latent_mode:
                 with torch.no_grad():
-                    y_hat = self.vae.decode(unet_output[:1] / 0.18215).sample
+                    y_hat = self.vae.decode(unet_output[:1] / 0.18215).sample.clamp(min=-1, max=1)
                     psnr_loss = self.psnr(y[:1], y_hat)
                     self.logger.log_image("reconstruction", [y_hat], step=self.global_step + 1)
+                    lpips_distance = self.lpips_metric(y[:1], y_hat)
                 self.log("PSNR", psnr_loss, on_step=True, prog_bar=True)
+                self.log("LPIPS", lpips_distance, on_step=True, prog_bar=True)
             else:
                 self.logger.log_image("reconstruction", [y_hat], step=self.global_step + 1)
                 psnr_loss = self.psnr(y, y_hat)
