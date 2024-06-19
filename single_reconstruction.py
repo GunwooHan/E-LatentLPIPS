@@ -2,20 +2,17 @@ import argparse
 
 import pytorch_lightning as pl
 import torch
-import torch.nn.functional as F
-import torchvision.transforms
 from PIL import Image
-from diffusers import AutoencoderKL, StableDiffusionPipeline, UNet2DModel
+from diffusers import StableDiffusionPipeline, UNet2DModel
 from pytorch_lightning.loggers import WandbLogger
 from torch import optim, nn
+from torch.optim.lr_scheduler import StepLR, ExponentialLR, ReduceLROnPlateau
 from torch.utils.data import DataLoader
 from torchmetrics.image import PeakSignalNoiseRatio, LearnedPerceptualImagePatchSimilarity
 from torchvision import transforms
-from torch.optim.lr_scheduler import StepLR, ExponentialLR, ReduceLROnPlateau
 
-from e_latent_lpips import e_latent_lpips
-from augmentation_test import BrightnessAdjust, ContrastAdjust
 from augment import AugmentPipe
+from e_latent_lpips import e_latent_lpips
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=42)
@@ -26,13 +23,6 @@ parser.add_argument('--step_size', type=int, default=10)
 parser.add_argument('--batch_size', type=int, default=1)
 parser.add_argument('--gamma', type=float, default=0.5)
 parser.add_argument('--lr_scheduler', type=str, default="constant")
-
-# parser.add_argument('--blit', type=bool, default=False)
-# parser.add_argument('--geom', type=bool, default=False)
-# parser.add_argument('--color', type=bool, default=False)
-# parser.add_argument('--filter', type=bool, default=False)
-# parser.add_argument('--noise', type=bool, default=False)
-# parser.add_argument('--cutout', type=bool, default=False)
 
 parser.add_argument('--xflip', type=bool, default=False)
 parser.add_argument('--rotate90', type=bool, default=False)
@@ -60,42 +50,29 @@ parser.add_argument('--saturation_std', type=float, default=0.1512400148904855)
 parser.add_argument('--noise_std', type=float, default=2.7745555720946613)
 parser.add_argument('--cutout_size', type=float, default=0.11603325043044192)
 
-parser.add_argument('--reconstruction_target', type=str, default='/dev/shm/single_reconstruction_sample.jpeg')
+parser.add_argument('--reconstruction_target', type=str, default='single_reconstruction_sample.jpeg')
 parser.add_argument('--lpips_model_path', type=str,
-                    default='checkpoints/latent_2afc/vgg-epoch=85-val_score=63.95.ckpt')
+                    default='checkpoints/LatentLPIPS.ckpt')
 parser.add_argument('--wandb', type=bool, default=True)
 parser.add_argument('--iterations', type=int, default=100000)
-parser.add_argument('--latent_mode', type=bool, default=True)
+parser.add_argument('--latent_mode', type=bool, default=False)
 parser.add_argument('--baseline', type=bool, default=False)
-parser.add_argument('--ensemble_mode', type=bool, default=True)
+parser.add_argument('--ensemble_mode', type=bool, default=False)
 args = parser.parse_args()
 
-
-# torch.set_float32_matmul_precision('medium' | 'high')
 
 class SingleReconstruction(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.save_hyperparameters(args)
         self.model = UNet2DModel(
-            in_channels=4,  # the number of input channels, 3 for RGB images
+            in_channels=4,  # the number of input channels
             out_channels=4,  # the number of output channels
             layers_per_block=2,  # how many ResNet layers to use per UNet block
             block_out_channels=(256, 512, 512),
             down_block_types=("DownBlock2D", "AttnDownBlock2D", "DownBlock2D"),
             up_block_types=("UpBlock2D", "AttnUpBlock2D", "UpBlock2D"),
         )
-        # self.model = UNet2DModel(
-        #     in_channels=4 if args.latent_mode else 3,  # the number of input channels, 3 for RGB images
-        #     out_channels=4 if args.latent_mode else 3,  # the number of output channels
-        #     layers_per_block=2,  # how many ResNet layers to use per UNet block
-        #     block_out_channels=(256, 512, 512) if args.latent_mode else (128, 128, 256, 256, 512, 512),
-        #     down_block_types=("DownBlock2D", "AttnDownBlock2D", "DownBlock2D") if args.latent_mode else (
-        #         "DownBlock2D", "DownBlock2D", "DownBlock2D", "DownBlock2D", "AttnDownBlock2D", "DownBlock2D"),
-        #     up_block_types=("UpBlock2D", "AttnUpBlock2D", "UpBlock2D") if args.latent_mode else (
-        #         "UpBlock2D", "AttnUpBlock2D", "UpBlock2D", "UpBlock2D", "UpBlock2D", "UpBlock2D"),
-        # )
-        # model_id = "CompVis/stable-diffusion-v1-5"
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.gamma = args.gamma
@@ -141,23 +118,6 @@ class SingleReconstruction(pl.LightningModule):
             param.requires_grad = False
 
     def create_ensemble_transform(self):
-        # transform = []
-        # if self.args.flip:
-        #     transform.append(transforms.RandomHorizontalFlip())
-        # if self.args.rotation:
-        #     transform.append(transforms.RandomRotation(degrees=[-90, 90],
-        #                                                interpolation=torchvision.transforms.InterpolationMode.BILINEAR))
-        # if self.args.translation:
-        #     transform.append(transforms.RandomAffine(degrees=30, translate=(0.2, 0.2)))
-        # if self.args.cutout:
-        #     transform.append(transforms.RandomErasing(p=0.5, scale=(0.02, 0.33), ratio=(0.3, 3.3)))
-        # if self.args.resize:
-        #     transform.append(transforms.RandomResizedCrop(size=64, scale=(0.5, 1.5), ratio=(0.5, 1.5)))
-        # if self.args.bright:
-        #     transform.append(BrightnessAdjust(1))
-        # if self.args.contrast:
-        #     transform.append(ContrastAdjust(1))
-        # return transforms.Compose(transform)
         return AugmentPipe(
             xflip=1 if self.args.xflip else 0,
             rotate90=1 if self.args.rotate90 else 0,
@@ -185,53 +145,22 @@ class SingleReconstruction(pl.LightningModule):
             cutout_size=args.cutout_size,
         )
 
-        # Isotropic scaling (uniform scaling)
-
-        # # Brightness adjustment
-        # brightness = transforms.ColorJitter(brightness=0.5)
-        #
-        # # Saturation adjustment
-        # saturation = transforms.ColorJitter(saturation=0.5)
-        #
-        # # Random contrast
-        # random_contrast = transforms.ColorJitter(contrast=0.5)
-
     def training_step(self, batch, batch_idx):
         x, y = batch
-        if self.latent_mode and batch_idx == 0:
-            self.scaled_y_encode = self.vae.encode(y).latent_dist.sample() * 0.18215
-
         if self.latent_mode:
-            # y_hat = self.model(x, args.seed, self.encode_hidden_state).sample
             scaled_latent = x  # * 0.18215
             unet_output = self.model(scaled_latent, args.seed).sample
 
-            # y = 2 * (y - y.min()) / (y.max() - y.min()) - 1
-            # y_hat = 2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1
+            if batch_idx == 0:
+                self.scaled_y_encode = self.vae.encode(y).latent_dist.sample() * 0.18215
+
         else:
             x0 = self.vae.encode(x).latent_dist.sample()
             x1 = self.model(x0, args.seed).sample
             y_hat = self.vae.decode(x1).sample
-            #
-            # # Normalize y and y_hat to be in range -1 to 1
-            # y = 2 * (y - y.min()) / (y.max() - y.min()) - 1
-            # y_hat = 2 * (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) - 1
-
         if self.ensemble_mode:
-            transformed_unet_outputs_list = []
-            transformed_scaled_y_encode_list = []
-
-            # for i in range(x.size(0)):
-            #     transformed = self.ensemble_transform(torch.cat([unet_output[i].unsqueeze(0), scaled_y_encode[i].unsqueeze(0)], dim=0))
-            #     transformed_unet_outputs_list.append(transformed[:1, ...])
-            #     transformed_scaled_y_encode_list.append(transformed[1:, ...])
-
             transformed_unet_outputs, transformed_scaled_y_encode = self.ensemble_transform(unet_output,
                                                                                             self.scaled_y_encode)
-
-            # transformed_unet_outputs = torch.cat(transformed_unet_outputs_list, dim=0)
-            # transformed_scaled_y_encode = torch.cat(transformed_scaled_y_encode_list, dim=0)
-
             lpips_loss = self.lpips(
                 2 * (transformed_unet_outputs - transformed_unet_outputs.min()) / (
                         transformed_unet_outputs.max() - transformed_unet_outputs.min()) - 1,
@@ -241,14 +170,10 @@ class SingleReconstruction(pl.LightningModule):
             lpips_loss = self.lpips(2 * (unet_output - unet_output.min()) / (unet_output.max() - unet_output.min()) - 1,
                                     2 * (self.scaled_y_encode - self.scaled_y_encode.min()) / (
                                             self.scaled_y_encode.max() - self.scaled_y_encode.min()) - 1).mean()
-        # y = (y - y.min()) / (y.max() - y.min()) * 2 - 1
-        # y_hat = (y_hat - y_hat.min()) / (y_hat.max() - y_hat.min()) * 2 - 1
-        # lpips_torch_loss = self.lpips_torch(y, y_hat)
 
         self.log("lpips_loss", lpips_loss, on_step=True, prog_bar=True)
-        # self.log("lpips_torch_loss", lpips_torch_loss, on_step=True, prog_bar=True)
 
-        if batch_idx % 5000 == 0:
+        if batch_idx % 500 == 0:
             if args.latent_mode:
                 with torch.no_grad():
                     y_hat = self.vae.decode(unet_output[:1] / 0.18215).sample.clamp(min=-1, max=1)
@@ -383,14 +308,12 @@ class ContrastAdjust(nn.Module):
 
         batch_size, channels, height, width = input_tensor.shape
 
-        # 4차원 입력 텐서에 대해 contrast 조정을 적용합니다.
         output_tensor = torch.empty_like(input_tensor)
         for i in range(batch_size):
             img = input_tensor[i]
-            # 이미지를 각 채널별로 분리합니다.
             mean = img.mean([1, 2], keepdim=True)
             adjusted_img = (img - mean) * self.contrast_factor + mean
-            output_tensor[i] = adjusted_img.clamp(0, 1)  # 값의 범위를 [0, 1]로 클램프합니다.
+            output_tensor[i] = adjusted_img.clamp(0, 1)
 
         return output_tensor
 
@@ -414,12 +337,10 @@ if __name__ == '__main__':
     )
 
     model = SingleReconstruction(args)
-    # model.lpips.model.load_state_dict(torch.load("checkpoints/latest_net_.pth"))
-    # model.lpips.rank_loss.net.load_state_dict(torch.load("checkpoints/latest_net_rank.pth"))
 
     trainer = pl.Trainer(
         devices=1,
-        max_steps=args.iterations+1,
+        max_steps=args.iterations + 1,
         logger=wandb_logger if args.wandb else None,
     )
     trainer.fit(model, train_dataloaders=dm.train_dataloader())

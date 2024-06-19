@@ -29,9 +29,6 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, default='vgg')
     parser.add_argument('--checkpoints_dir', type=str, default='checkpoints')
     parser.add_argument('--pretrained', type=bool, default=True)
-    parser.add_argument('--from_scratch', type=bool, default=False)
-    parser.add_argument('--train_trunk', type=bool, default=False)
-    parser.add_argument('--ensemble_model', type=bool, default=False)
     parser.add_argument('--latent_mode', type=bool, default=False)
 
     parser.add_argument('--data_dir', type=str, default='dataset')

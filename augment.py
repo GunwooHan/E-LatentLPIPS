@@ -596,14 +596,11 @@ if __name__ == '__main__':
         imgfilter=1 if args.filter else 0,
         noise=1 if args.noise else 0,
         cutout=1 if args.cutout else 0,
-    )  # transform = AugmentPipe(xflip=1, rotate90=1, xint=1, scale=1, rotate=1, aniso=1, xfrac=1, imgfilter=1, noise=1, cutout=1)
+    )  
     outputs = []
-    ref_inputs = torch.load("/dev/shm/latent_2afc/val/cnn/ref/000000.pt").unsqueeze(0)
-    p0_inputs = torch.load("/dev/shm/latent_2afc/val/cnn/ref/000000.pt").unsqueeze(0)
+    ref_inputs = torch.load("latent_2afc/val/cnn/ref/000000.pt").unsqueeze(0)
+    p0_inputs = torch.load("latent_2afc/val/cnn/ref/000000.pt").unsqueeze(0)
 
-    # from torchvision.io import read_image
-    # ref_inputs = read_image("single_reconstruction_sample.jpeg").unsqueeze(0)
-    # p0_inputs = read_image("single_reconstruction_sample.jpeg").unsqueeze(0)
 
     for i in range(8):
         outputs.append(torch.cat(transform(p0_inputs, ref_inputs), dim=0))

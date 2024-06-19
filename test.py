@@ -14,12 +14,13 @@ if __name__ == '__main__':
     parser.add_argument('--num_workers', type=int, default=16)
 
     parser.add_argument('--model', type=str, default='vgg')
-    parser.add_argument('--model_path', type=str, default='checkpoints/latent/vgg-epoch=08-val/score=75.62.ckpt')
-    # parser.add_argument('--model_path', type=str, default='')
+    parser.add_argument('--model_path', type=str, default='checkpoints/LatentLPIPS.ckpt')
 
     parser.add_argument('--data_dir', type=str, default='dataset')
     parser.add_argument('--dataset_mode', type=str, default='latent_2afc')
-    parser.add_argument('--val_dataset_dir', type=str, nargs='+', default=['val/traditional'])
+    parser.add_argument('--val_dataset_dir', type=str, nargs='+',
+                        default=['val/traditional', 'val/cnn', 'val/deblur', 'val/frameinterp', 'val/color',
+                                 'val/superres'])
     parser.add_argument('--latent_mode', type=bool, default=False)
     args = parser.parse_args()
 

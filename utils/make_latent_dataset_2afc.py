@@ -1,23 +1,19 @@
+import argparse
 import glob
 import os
-import argparse
 import shutil
 
 import torch
-import torch.nn.functional as F
-from torchvision import transforms
-import numpy as np
-from PIL import Image
-from diffusers import AutoencoderKL, StableDiffusionPipeline
 import tqdm
+from PIL import Image
+from diffusers import StableDiffusionPipeline
+from torchvision import transforms
 
-# vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-ema")
 pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
 vae = pipe.vae
 vae.eval()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 vae = vae.to(device)
-
 
 def preprocess_image(image_paths):
     transform = transforms.Compose([
@@ -36,7 +32,7 @@ def encode_image(image_tensor):
     return latents
 
 
-def process_images(input_dir, output_dir, batch_size=32, image_size=64):
+def process_images(input_dir, output_dir, batch_size=32):
     files = []
     for extension in ['.png', '.jpg', '.jpeg', '.bmp', '.gif', '.tiff', '.npy']:
         files += glob.glob(os.path.join(input_dir, "**", "*" + extension), recursive=True)
@@ -74,8 +70,7 @@ if __name__ == '__main__':
     parser.add_argument('--input_dir', type=str, default='dataset/2afc')
     parser.add_argument('--output_dir', type=str, default='dataset/latent_2afc')
     parser.add_argument('--batch_size', type=int, default=64)
-    parser.add_argument('--image_size', type=int, default=64)
     args = parser.parse_args()
 
     # 이미지 처리
-    process_images(args.input_dir, args.output_dir, batch_size=args.batch_size, image_size=args.image_size)
+    process_images(args.input_dir, args.output_dir, batch_size=args.batch_size)
