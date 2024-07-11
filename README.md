@@ -6,6 +6,7 @@
 </div>
 
 ## News
+- [24/07/11] release pretrained latent vgg network weights for E-Latent LPIPS
 - [24/06/19] release Ensemble hyperparameter for E-Latent LPIPS
 - [24/06/18] code release
 
@@ -93,6 +94,9 @@ BAPPS dataset usage(https://github.com/richzhang/PerceptualSimilarity/tree/maste
 
 By default, `make_latent_dataset_2afc.py` encode as `runwayml/stable-diffusion-v1-5`. If you want to use another VAE or
 encoder, change the huggingface url
+
+### checkpoints
+you can download pretrained latent vgg netwotk this link (https://drive.google.com/file/d/1558700cub2hjAv-fXcyUGJUJBTrm5m3g/view?usp=sharing)
 
 ### Latent LPIPS Train
 ```
